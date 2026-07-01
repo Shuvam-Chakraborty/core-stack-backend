@@ -41,6 +41,11 @@ urlpatterns = [
         name="generate_terrain_descriptor",
     ),
     path(
+        "generate_terrain_compute_all/",
+        api.generate_terrain_compute_all,
+        name="generate_terrain_compute_all",
+    ),
+    path(
         "generate_terrain_raster/",
         api.generate_terrain_raster,
         name="generate_terrain_raster",
@@ -248,4 +253,45 @@ urlpatterns = [
         "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
     ),
     path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path("spei/", api.generate_spei, name="spei"),
+    path(
+        "drought_resilience_resistance/",
+        api.drought_resilience_resistance,
+        name="drought_resilience_resistance",
+    ),
+    path(
+        "rainfall_resilience_resistance/",
+        api.rainfall_resilience_resistance,
+        name="rainfall_resilience_resistance",
+    ),
+    path(
+        "generate_dem_raster_vector/",
+        api.generate_fabdem_raster_vector,
+        name="generate-dem-raster-vector",
+    ),
+    path(
+        "generate_canal_vector/",
+        api.generate_canal_vector,
+        name="generate-canal-vector",
+    ),
+    path(
+        "generate_river_data/",
+        api.generate_river_data,
+        name="generate-river-data",
+    ),
+    path(
+        "generate_density_vector/",
+        api.generate_drainage_density_data,
+        name="generate-drainage-density-vector",
+    ),
+    path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
 ]
