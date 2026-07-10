@@ -29,7 +29,11 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
-from computing.layer_dependency.layer_generation_in_order import layer_generate_map
+from computing.layer_dependency.layer_generation_in_order import (
+    layer_generate_map,
+    normalize_compute as _normalize_layer_order_compute,
+    validate_layer_map_request,
+)
 from computing.misc.drainage_lines import (
     clip_drainage_lines as clip_drainage_lines_gee_task,
 )
@@ -130,12 +134,19 @@ from .terrain_descriptor.terrain_raster_fabdem import (
 from .terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
 )
-from .tree_health.canopy_height import tree_health_ch_raster
-from .tree_health.canopy_height_vector import tree_health_ch_vector
-from .tree_health.ccd import tree_health_ccd_raster
-from .tree_health.ccd_vector import tree_health_ccd_vector
-from .tree_health.overall_change import tree_health_overall_change_raster
-from .tree_health.overall_change_vector import tree_health_overall_change_vector
+from .tree_health.gee.canopy_height import tree_health_ch_raster
+from .tree_health.gee.canopy_height_vector import tree_health_ch_vector
+from .tree_health.gee.ccd import tree_health_ccd_raster
+from .tree_health.gee.ccd_vector import tree_health_ccd_vector
+from .tree_health.gee.overall_change import tree_health_overall_change_raster
+from .tree_health.gee.overall_change_vector import tree_health_overall_change_vector
+from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
+from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
+from .tree_health.local.ccd_local import tree_health_ccd_raster_local
+from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
+from .tree_health.local.overall_change_local import tree_health_overall_change_raster_local
+from .tree_health.local.overall_change_vector_local import tree_health_overall_change_vector_local
+
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -149,7 +160,6 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
-from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import (
     check_missing_layers,
     layer_status,
@@ -1096,39 +1106,54 @@ def tree_health_raster(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        tree_health_ccd_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+
+        compute = _get_compute_mode(request)
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
+        ccd_task = _select_compute_task(
+            compute,
+            tree_health_ccd_raster,
+            tree_health_ccd_raster_local,
+        )
+        print("What is task? ", ccd_task)
+
+        ccd_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
-        tree_health_ch_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+
+        ch_task = _select_compute_task(
+            compute,
+            tree_health_ch_raster,
+            tree_health_ch_raster_local,
+        )
+        print("What is task? ", ch_task)
+        ch_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
-        tree_health_overall_change_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+        overall_task = _select_compute_task(
+            compute,
+            tree_health_overall_change_raster,
+            tree_health_overall_change_raster_local,
+        )
+        print("What is task? ", overall_task)
+        overall_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
+
 
         return Response(
             {"Success": "tree_health task initiated"},
@@ -1151,39 +1176,70 @@ def tree_health_vector(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
 
-        tree_health_ch_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+        compute = _get_compute_mode(request)
+
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
+
+        ccd_task = _select_compute_task(
+            compute,
+            tree_health_ccd_vector,
+            tree_health_ccd_vector_local,
+        )
+        print("What is task? ", ccd_task)
+
+        ccd_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
-        tree_health_ccd_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+        ch_task = _select_compute_task(
+            compute,
+            tree_health_ch_vector,
+            tree_health_ch_vector_local,
+        )
+        print("What is task? ", ch_task)
+
+        ch_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
-        tree_health_overall_change_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
+        overall_task = _select_compute_task(
+            compute,
+            tree_health_overall_change_vector,
+            tree_health_overall_change_vector_local,
+        )
+        print("What is task? ", overall_task)
+
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
+
+        overall_task.apply_async(
+            kwargs=task_kwargs,
             queue="nrm",
         )
+
         return Response(
             {"Success": "Overall_change_vector task initiated"},
             status=status.HTTP_200_OK,
@@ -1554,8 +1610,17 @@ def generate_layer_in_order(request):
         gee_account_id = request.data.get("gee_account_id")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
+
+        validation_errors = validate_layer_map_request(map_order, compute=compute)
+        if validation_errors:
+            return Response(
+                {"Exception": "; ".join(validation_errors)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         layer_generate_map.apply_async(
             kwargs={
                 "state": state,
@@ -1565,12 +1630,16 @@ def generate_layer_in_order(request):
                 "gee_account_id": gee_account_id,
                 "start_year": start_year,
                 "end_year": end_year,
+                "compute": compute,
             },
             queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in generate_layer_order_first api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_layer_order_first api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1961,7 +2030,7 @@ def generate_facilities_proximity(request):
             generate_facilities_proximity_task,
             generate_facilities_proximity_local_task,
         )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -2452,7 +2521,7 @@ def rainfall_resilience_resistance(request):
     except Exception as e:
         print("Exception in rainfall_resilience_resistance api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(["POST"])
 @schema(None)
@@ -2561,7 +2630,7 @@ def generate_drainage_density_data(request):
     except Exception as e:
         print("Exception in river data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(["POST"])
 @schema(None)
