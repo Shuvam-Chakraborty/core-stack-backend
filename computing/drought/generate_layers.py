@@ -10,14 +10,14 @@ from utilities.constants import (
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     ee_initialize,
     check_task_status,
     make_asset_public,
     create_gee_dir,
     get_gee_dir_path,
     export_vector_asset_to_gee,
-    build_gee_helper_paths,
-)
+    build_gee_helper_paths,)
 
 
 def get_day_of_year(date):
@@ -189,14 +189,14 @@ def drought_chunk(
         + str(current_year + 1)
         + "-06-30_LULCmap_10m"
     )
-    cur_year_crop_img = ee.Image(lulc_path)
+    cur_year_crop_img = load_gee_asset(lulc_path, asset_type="Image")
     lulc_scale = 10
     lulc_available_from_year = start_year
     lulc_y = start_year
     lulc_images = []
     while lulc_y <= end_year:
         lulc_images.append(
-            ee.Image(
+            load_gee_asset(
                 get_gee_dir_path(
                     asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
                 )
@@ -206,7 +206,7 @@ def drought_chunk(
                 + "-07-01_"
                 + str(lulc_y + 1)
                 + "-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
         )
         lulc_y += 1
     lulc = ee.List(lulc_images)

@@ -18,8 +18,8 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     make_asset_public,
     is_gee_asset_exists,
-    get_gee_dir_path,
-)
+    load_gee_asset,
+    get_gee_dir_path,)
 import numpy as np
 from nrm_app.settings import MEDIA_ROOT
 
@@ -106,7 +106,7 @@ def get_nearest_waterbody(lat, lon, waterbodies_asset_id):
     """
     # Load waterbodies FeatureCollection from GEE asset
 
-    waterbodies_fc = ee.FeatureCollection(waterbodies_asset_id)
+    waterbodies_fc = load_gee_asset(waterbodies_asset_id)
 
     # Create a point geometry from the provided lat/lon
     point = ee.Geometry.Point([lon, lat])
@@ -260,7 +260,7 @@ def generate_water_mask_lulc(years):
 
 def clip_lulc_output(mws_asset_id, proj_id, gee_project_id):
 
-    mws = ee.FeatureCollection(mws_asset_id)
+    mws = load_gee_asset(mws_asset_id)
     try:
 
         clipped_geom = mws.simplify(100)
@@ -284,7 +284,7 @@ def clip_lulc_output(mws_asset_id, proj_id, gee_project_id):
         asset_id = f"{lulc_asset_id_base}_{start_date}_{end_date}_LULCmap_10m"
         delete_asset_on_GEE(asset_id)
         lulc_path = f"{PAN_INDIA_LULC_BASE_PATH}_{year}"  # Adjust this according to your naming convention
-        lulc = ee.Image(lulc_path)
+        lulc = load_gee_asset(lulc_path, asset_type="Image")
 
         # Clip the LULC image to the MWS boundary
         lulc_clipped = lulc.clipToCollection(mws)
@@ -316,7 +316,7 @@ def clip_lulc_output(mws_asset_id, proj_id, gee_project_id):
             + "_"
             + str(year)
         )
-        image = ee.Image(asset_id)
+        image = load_gee_asset(asset_id, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 10, gcs_file_name)
 
         task_id_list = check_task_status([task_id])
@@ -529,7 +529,7 @@ def merge_assets_chunked_on_year(chunk_assets):
         for i in range(1, len(chunk_assets)):
             # Find the matching feature in the second collection
             matched_feature = ee.Feature(
-                ee.FeatureCollection(chunk_assets[i])
+                load_gee_asset(chunk_assets[i])
                 .filter(ee.Filter.eq("UID", uid))
                 .first()
             )
@@ -546,7 +546,7 @@ def merge_assets_chunked_on_year(chunk_assets):
         return ee.Feature(feature.geometry(), merged_properties)
 
     # Map the merge function over the first feature collection
-    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+    merged_fc = load_gee_asset(chunk_assets[0]).map(merge_features)
     return merged_fc
 
 
@@ -562,7 +562,7 @@ def get_ndvi_for_zoi(
         + asset_suffix_ndvi
     )
 
-    zoi_collections = ee.FeatureCollection(zoi_asset_path)
+    zoi_collections = load_gee_asset(zoi_asset_path)
 
     fc = get_ndvi_data(zoi_collections, 2017, 2024, asset_suffix_ndvi, ndvi_asset_path)
     task = ee.batch.Export.table.toAsset(
@@ -578,8 +578,8 @@ def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
     ee_initialize("")
 
     # Load FeatureCollections
-    mw_fc = ee.FeatureCollection(mws_asset_id)
-    draught_fc = ee.FeatureCollection(draught_asset_id)
+    mw_fc = load_gee_asset(mws_asset_id)
+    draught_fc = load_gee_asset(draught_asset_id)
 
     # Define spatial filter (intersects)
     spatial_filter = ee.Filter.intersects(
@@ -663,7 +663,7 @@ def generate_zoi_ring_layer(zoi_fc, proj_id):
 
     # Step 7: Create ZOI Rings
     zoi_rings = (
-        ee.FeatureCollection(zoi_asset_id)
+        load_gee_asset(zoi_asset_id)
         .filter(ee.Filter.gt("zoi_wb", 0))
         .map(create_ring)
     )

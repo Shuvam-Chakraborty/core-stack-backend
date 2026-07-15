@@ -21,6 +21,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     get_gee_dir_path,
     get_gee_asset_path,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
     check_task_status,
@@ -198,7 +199,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
 
         # Load and filter
         facilities_fc = ee.FeatureCollection(GEE_FACILITIES_DATASET_PATH)
-        admin_boundary = ee.FeatureCollection(admin_boundary_path)
+        admin_boundary = load_gee_asset(admin_boundary_path)
         output_fc = _build_facilities_output_fc(admin_boundary, facilities_fc)
 
         # Step 4: Export as GEE asset
@@ -230,7 +231,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
 
             # Step 6: Sync to GeoServer
             print(f"[{datetime.now()}] Syncing to GeoServer...")
-            fc = ee.FeatureCollection(asset_id)
+            fc = load_gee_asset(asset_id)
             res = sync_fc_to_geoserver(
                 fc, state, f"{layer_name}", FACILITIES_GEOSERVER_WORKSPACE
             )
